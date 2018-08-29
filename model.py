@@ -12,7 +12,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.iteration = 0
-        self.vectorSize = vectorSize 
+        self.vectorSize = numClasses 
         self.hiddenSize = 64
         self.numLayers = 3
 
@@ -24,10 +24,10 @@ class Model(nn.Module):
             self.numClasses = 1
             self.loss_fn = nn.MSELoss()
 
-        self.lstm = nn.LSTM(1, self.hiddenSize, self.numLayers, dropout=0.1)
+        self.lstm = nn.LSTM(self.vectorSize, self.hiddenSize, self.numLayers, dropout=0.1)
         self.fc = nn.Sequential(
                 #nn.Softmax(dim=1),
-                nn.Linear(self.hiddenSize, self.numClasses))
+                nn.Linear(self.vectorSize * self.hiddenSize, self.numClasses))
         self.hidden = self.init_hidden()
         self.old_hidden = self.hidden
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
@@ -36,16 +36,11 @@ class Model(nn.Module):
             self.cuda()
 
     def init_hidden(self):
-        return (Variable(torch.zeros(self.numLayers, 1, self.hiddenSize)),
-        Variable(torch.zeros(self.numLayers, 1, self.hiddenSize)))
+        return (Variable(torch.zeros(self.numLayers, self.vectorSize, self.hiddenSize)),
+        Variable(torch.zeros(self.numLayers, self.vectorSize, self.hiddenSize)))
 
-    def forward(self, x, adjust=True):
-        if adjust:
-            self.hidden = self.old_hidden
-            x, self.hidden = self.lstm(x, self.hidden)
-            self.old_hidden = self.hidden
-        else:
-            x, self.hidden = self.lstm(x, self.hidden)
+    def forward(self, x):
+        x, self.hidden = self.lstm(x, self.hidden)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
@@ -67,7 +62,7 @@ class Model(nn.Module):
         if adjust:
             self.optimizer.zero_grad()
             #self.hidden = self.init_hidden()
-            y_prediction = self(x, adjust=adjust)
+            y_prediction = self(x)
             loss = self.loss_fn(y_prediction, y.long() if self.crossEntropy else y)
             if self.iteration == 1:
                 loss.backward(retain_graph=True)
