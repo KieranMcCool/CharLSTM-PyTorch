@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import SequentialSampler, RandomSampler
+from torch.utils.data.sampler import SequentialSampler, RandomSampler, Sampler
+from random import shuffle
 
 class DataSet(Dataset):
     def __init__(self, fname):
@@ -9,21 +10,22 @@ class DataSet(Dataset):
         self.data = ''
         self.corpus = []
         with open(fname, 'r') as f:
-            self.data = list(f.read().split(' '))
+            self.data = list(f.read())
             self.corpus = list(set(list(self.data)))
 
     def __len__(self):
         return len(self.data) - 1
 
     def __getitem__(self, i):
-        inputvalue = one_hot(self.getLabelFromChar(self.data[i]), len(self.corpus))
-        inputvalue = torch.Tensor(inputvalue)
-        targetvalue = torch.Tensor([[self.getLabelFromChar(self.data[i+1])]])
+        start, end = self.data[i], self.data[i+1]
+        inputvalue = torch.zeros(1, len(self.corpus))
+        inputvalue[0] = one_hot(self.getLabelFromChar(start), len(self.corpus))
+        targetvalue = torch.Tensor([[self.getLabelFromChar(end)]])
         return [ inputvalue, targetvalue ]
 
-    def sequentialSampler(self):
-        return DataLoader(self, sampler=SequentialSampler(self), 
-                batch_size=10, num_workers=4)
+    def sequentialSampler(self, batch_size):
+        return DataLoader(self, sampler=RandomSequentialSampler(self, 800), 
+                batch_size=batch_size, num_workers=8)
 
     def getLabelFromChar(self, c):
         return self.corpus.index(c)
@@ -35,3 +37,18 @@ def one_hot(l, classes):
     x = torch.zeros(classes)
     x[l] = 1
     return x
+
+class RandomSequentialSampler(Sampler):
+    def __init__(self, datasource, seqCount):
+        self.source = datasource
+        self.seqCount = seqCount
+
+    def __iter__(self):
+        flatten = lambda l: [item for sublist in l for item in sublist]
+        groups = [[range(i, i + self.seqCount)] for i in range(0,len(self),self.seqCount)]
+        shuffle(groups)
+        groups = flatten(flatten(groups))
+        return iter(groups)
+
+    def __len__(self):
+        return len(self.source) - self.seqCount
