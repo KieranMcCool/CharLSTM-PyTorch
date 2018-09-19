@@ -31,7 +31,7 @@ class Model(nn.Module):
                 dropout=0.1, batch_first=True)
         self.fc = nn.Sequential(
                nn.BatchNorm1d(self.hiddenSize),
-               nn.Softmax(),
+               nn.Softmax(dim=1),
                 nn.Linear(self.hiddenSize, self.numClasses))
         self.hidden = self.init_hidden()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
